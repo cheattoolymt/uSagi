@@ -167,6 +167,21 @@ static Node *parse_primary(Parser *p) {
     if (t.type==TOK_LPAREN) {
         p_advance(p); Node *n=parse_expr(p); p_expect(p,TOK_RPAREN,"expected ')'"); return n;
     }
+    /* gui.xxx(...) / file.xxx(...) — 式文脈でも使えるように */
+    if (t.type==TOK_GUI_CALL || t.type==TOK_FILE_CALL) {
+        p_advance(p);
+        NodeType ntype = (t.type==TOK_GUI_CALL) ? NODE_GUI_CALL : NODE_FILE_CALL;
+        /* method名をstr_valに (tok.value = "gui.init" -> "init") */
+        const char *dot=strchr(t.value,'.');
+        const char *mname = dot ? dot+1 : t.value;
+        p_expect(p,TOK_LPAREN,"expected '(' after gui/file method");
+        Node *n=node_new(ntype,t.line,t.col); n->str_val=strdup(mname);
+        while (!p_check(p,TOK_RPAREN)&&!p_check(p,TOK_EOF)) {
+            node_add_child(n,parse_expr(p)); p_match(p,TOK_COMMA);
+        }
+        p_expect(p,TOK_RPAREN,"expected ')'");
+        return n;
+    }
     if (t.type==TOK_IDENT) {
         p_advance(p);
         if (p_check(p,TOK_LPAREN)) {
@@ -384,6 +399,21 @@ static Node *parse_stmt(Parser *p) {
         Token var=p_expect(p,TOK_IDENT,"expected variable name");
         Node *vn=node_new(NODE_IDENT,var.line,var.col); vn->str_val=strdup(var.value);
         node_add_child(n,vn);
+        p_expect(p,TOK_RPAREN,"expected ')'"); p_match(p,TOK_SEMICOLON); return n;
+    }
+
+    /* gui.xxx(...); / file.xxx(...);  — ステートメントとしての呼び出し */
+    if (t.type==TOK_GUI_CALL || t.type==TOK_FILE_CALL) {
+        p_advance(p);
+        NodeType ntype = (t.type==TOK_GUI_CALL) ? NODE_GUI_CALL : NODE_FILE_CALL;
+        const char *dot=strchr(t.value,'.');
+        const char *mname = dot ? dot+1 : t.value;
+        p_expect(p,TOK_LPAREN,"expected '(' after gui/file method");
+        Node *n=node_new(ntype,t.line,t.col); n->str_val=strdup(mname);
+        while (!p_check(p,TOK_RPAREN)&&!p_check(p,TOK_EOF)) {
+            if (p_check(p,TOK_VOID)) { p_advance(p); break; }
+            node_add_child(n,parse_expr(p)); p_match(p,TOK_COMMA);
+        }
         p_expect(p,TOK_RPAREN,"expected ')'"); p_match(p,TOK_SEMICOLON); return n;
     }
 

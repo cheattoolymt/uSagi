@@ -183,6 +183,7 @@ static const char *acg_safe(const char *name) {
 static void acg_emit_expr(AsmCG *cg, Node *n);
 static void acg_emit_stmt(AsmCG *cg, Node *n);
 static void acg_emit_block(AsmCG *cg, Node *block);
+static void acg_emit_api_call(AsmCG *cg, Node *n, const char *prefix);
 
 static const char *int_arg_regs[6]={"rdi","rsi","rdx","rcx","r8","r9"};
 static const char *xmm_arg_regs[8]={"xmm0","xmm1","xmm2","xmm3","xmm4","xmm5","xmm6","xmm7"};
@@ -483,6 +484,18 @@ static void acg_emit_expr(AsmCG *cg, Node *n) {
                 else        OUT(cg,"    movq %d(%%rbp), %%rax\n", off3);
                 break;
             }
+            /* alloc(n) — n個のint(long=8byte)をzero初期化して確保 → ポインタ返却
+             * 使い方: buf = int[]  buf = alloc(0x10000) */
+            if (!strcmp(n->str_val,"alloc")&&n->child_count==1) {
+                acg_emit_expr(cg,n->children[0]); /* rax = n (要素数) */
+                OUT(cg,"    movq %%rax, %%rdi\n"); /* rdi = nmemb */
+                OUT(cg,"    movq $8, %%rsi\n");    /* rsi = size = 8 bytes/elem */
+                OUT(cg,"    subq $8, %%rsp\n");    /* 16バイトアライン */
+                OUT(cg,"    xorb %%al, %%al\n");
+                OUT(cg,"    call calloc\n");        /* calloc(n, 8) — zero init */
+                OUT(cg,"    addq $8, %%rsp\n");
+                break;
+            }
 
             
             int argc=n->child_count;
@@ -562,9 +575,53 @@ static void acg_emit_expr(AsmCG *cg, Node *n) {
             break;
         }
 
+        /* ── gui.xxx / file.xxx 式コード生成 ──────────────────── */
+        case NODE_GUI_CALL:
+            acg_emit_api_call(cg,n,"gui");
+            break;
+        case NODE_FILE_CALL:
+            acg_emit_api_call(cg,n,"file");
+            break;
+
         default:
             OUT(cg,"    xorq %%rax, %%rax\n");
             break;
+    }
+} ─────────────────────────────
+ * gui.xxx → usagi_gui_xxx
+ * file.xxx → usagi_file_xxx
+ * int[] を渡す引数はポインタ(rax)をそのまま渡す (uSagi int[] = long*)
+ */
+static void acg_emit_api_call(AsmCG *cg, Node *n, const char *prefix) {
+    /* C呼び出し規約で引数をセット (最大6個整数引数) */
+    static const char *int_arg_regs6[]={"rdi","rsi","rdx","rcx","r8","r9"};
+    int argc=n->child_count;
+    /* 全引数を評価してスタックへ */
+    for (int i=0;i<argc;i++) {
+        acg_emit_expr(cg,n->children[i]);
+        OUT(cg,"    pushq %%rax\n");
+    }
+    /* スタックからレジスタへ (逆順) */
+    for (int i=0;i<argc&&i<6;i++) {
+        int stack_pos=(argc-1-i)*8;
+        OUT(cg,"    movq %d(%%rsp), %%%s\n", stack_pos, int_arg_regs6[i]);
+    }
+    /* スタックアライメント調整 */
+    if (argc>0) {
+        int extra=(argc*8)%16; if(extra) OUT(cg,"    subq $%d, %%rsp\n",16-extra);
+    } else {
+        OUT(cg,"    subq $8, %%rsp\n");
+    }
+    OUT(cg,"    xorb %%al, %%al\n");
+    /* 関数名: usagi_gui_xxx / usagi_file_xxx */
+    OUT(cg,"    call usagi_%s_%s\n", prefix, n->str_val);
+    /* スタック解放 */
+    if (argc>0) {
+        int extra=(argc*8)%16;
+        int total=argc*8+(extra?(16-extra):0);
+        OUT(cg,"    addq $%d, %%rsp\n", total);
+    } else {
+        OUT(cg,"    addq $8, %%rsp\n");
     }
 }
 
@@ -1007,6 +1064,11 @@ static void acg_emit_stmt(AsmCG *cg, Node *n) {
         }
 
         case NODE_FUNC_CALL:
+            acg_emit_expr(cg,n); break;
+
+        /* ── gui.xxx / file.xxx ステートメント ─────────────────── */
+        case NODE_GUI_CALL:
+        case NODE_FILE_CALL:
             acg_emit_expr(cg,n); break;
 
         case NODE_BLOCK:

@@ -151,11 +151,16 @@ static const char *tc_expr_type(Node *n, TCScope *locals, TCScope *globals) {
                 !strcmp(n->str_val,"<") ||!strcmp(n->str_val,">")||
                 !strcmp(n->str_val,"<=")||!strcmp(n->str_val,">=")) return "bool";
             if (!strcmp(n->str_val,"&&")||!strcmp(n->str_val,"||")) return "bool";
+            /* bitwise ops always return int */
+            if (!strcmp(n->str_val,"&")||!strcmp(n->str_val,"|")||
+                !strcmp(n->str_val,"^")||!strcmp(n->str_val,"<<")||
+                !strcmp(n->str_val,">>")) return "int";
             if ((lt&&!strcmp(lt,"float"))||(rt&&!strcmp(rt,"float"))) return "float";
             return lt?lt:rt;
         }
         case NODE_UNOP:
             if (n->str_val&&!strcmp(n->str_val,"not")) return "bool";
+            if (n->str_val&&!strcmp(n->str_val,"~")) return "int";
             return tc_expr_type(n->children[0],locals,globals);
         case NODE_CONCAT: return "str";
         case NODE_FUNC_CALL: {
@@ -260,8 +265,6 @@ static void tc_stmt(Node *n, TCScope *locals, TCScope *globals, int loop_depth, 
             tcs_def_add(n->str_val,n->params,n->param_types,n->param_count);
             break;
         case NODE_BLOCK: tc_block(n,locals,globals,loop_depth,func_ret); break;
-        case NODE_GUI_CALL:  break;  /* 型チェックスキップ */
-        case NODE_FILE_CALL: break;  /* 型チェックスキップ */
         default: break;
     }
 }

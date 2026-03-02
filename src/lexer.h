@@ -29,6 +29,10 @@ typedef enum {
     TOK_WHILE, TOK_FOR, TOK_LOOP,
     TOK_END, TOK_ALLEND,
     TOK_TERMINAL_PRINT, TOK_TERMINAL_INPUT,
+    /* gui.xxx  例: gui.init / gui.window / ... */
+    TOK_GUI_CALL,
+    /* file.xxx 例: file.open / file.close / ... */
+    TOK_FILE_CALL,
     TOK_RETURN,
     TOK_BREAK, TOK_CONTINUE,
     TOK_IN, TOK_TO,
@@ -171,6 +175,42 @@ static Token lex_ident(Lexer *l) {
         }
         if (strncmp(l->src+l->pos,"input",5)==0&&!isalnum(l->src[l->pos+5])&&l->src[l->pos+5]!='_') {
             l->pos+=5; l->col+=5; return make_token(TOK_TERMINAL_INPUT,"terminal.input",l->line,sc);
+        }
+        /* gui.xxx  —  1つ前のidentが "gui" の場合のみ */
+        {
+            int identlen=dot-start;
+            if (identlen==3 && strncmp(l->src+start,"gui",3)==0) {
+                static const char *gui_methods[]={"init","window","quit","clear","present","blit","poll","key","delay",NULL};
+                for (int _gi=0;gui_methods[_gi];_gi++) {
+                    int mlen=(int)strlen(gui_methods[_gi]);
+                    if (strncmp(l->src+l->pos,gui_methods[_gi],mlen)==0
+                        && !isalnum(l->src[l->pos+mlen]) && l->src[l->pos+mlen]!='_') {
+                        int valcap=mlen+5; char *val=malloc(valcap);
+                        snprintf(val,valcap,"gui.%s",gui_methods[_gi]);
+                        l->pos+=mlen; l->col+=mlen;
+                        Token tok=make_token(TOK_GUI_CALL,val,l->line,sc);
+                        free(val); return tok;
+                    }
+                }
+            }
+        }
+        /* file.xxx  —  1つ前のidentが "file" の場合のみ */
+        {
+            int identlen=dot-start;
+            if (identlen==4 && strncmp(l->src+start,"file",4)==0) {
+                static const char *file_methods[]={"open","close","read_byte","read_bytes","write_byte","write_bytes","seek","size","exists",NULL};
+                for (int _fi=0;file_methods[_fi];_fi++) {
+                    int mlen=(int)strlen(file_methods[_fi]);
+                    if (strncmp(l->src+l->pos,file_methods[_fi],mlen)==0
+                        && !isalnum(l->src[l->pos+mlen]) && l->src[l->pos+mlen]!='_') {
+                        int valcap=mlen+6; char *val=malloc(valcap);
+                        snprintf(val,valcap,"file.%s",file_methods[_fi]);
+                        l->pos+=mlen; l->col+=mlen;
+                        Token tok=make_token(TOK_FILE_CALL,val,l->line,sc);
+                        free(val); return tok;
+                    }
+                }
+            }
         }
         l->pos=dot; l->col=dc;
     }

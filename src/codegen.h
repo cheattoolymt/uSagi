@@ -288,11 +288,27 @@ static void emit_expr(Codegen *cg, Node *n) {
         case NODE_FUNC_CALL:
             if (!strcmp(n->str_val,"len")&&n->child_count==1&&n->children[0]->type==NODE_IDENT)
                 fprintf(cg->out,"%s_len",n->children[0]->str_val);
+            else if (!strcmp(n->str_val,"alloc")&&n->child_count==1) {
+                /* alloc(n) → (long*)calloc(n, sizeof(long)) */
+                fprintf(cg->out,"(long*)calloc("); emit_expr(cg,n->children[0]); fprintf(cg->out,", sizeof(long))");
+            }
             else {
                 fprintf(cg->out,"%s(",cg_safe_name(n->str_val));
                 for (int i=0;i<n->child_count;i++) { if(i)fprintf(cg->out,", "); emit_expr(cg,n->children[i]); }
                 fprintf(cg->out,")");
             }
+            break;
+        /* gui.xxx(...)  → usagi_gui_xxx(...) */
+        case NODE_GUI_CALL:
+            fprintf(cg->out,"usagi_gui_%s(",n->str_val);
+            for (int i=0;i<n->child_count;i++) { if(i)fprintf(cg->out,", "); emit_expr(cg,n->children[i]); }
+            fprintf(cg->out,")");
+            break;
+        /* file.xxx(...) → usagi_file_xxx(...) */
+        case NODE_FILE_CALL:
+            fprintf(cg->out,"usagi_file_%s(",n->str_val);
+            for (int i=0;i<n->child_count;i++) { if(i)fprintf(cg->out,", "); emit_expr(cg,n->children[i]); }
+            fprintf(cg->out,")");
             break;
         default: break;
     }
@@ -528,6 +544,8 @@ static void emit_stmt(Codegen *cg, Node *n) {
         case NODE_BREAK:    cg_indent(cg); fprintf(cg->out,"break;\n"); break;
         case NODE_CONTINUE: cg_indent(cg); fprintf(cg->out,"continue;\n"); break;
         case NODE_FUNC_CALL: cg_indent(cg); emit_expr(cg,n); fprintf(cg->out,";\n"); break;
+        case NODE_GUI_CALL:  cg_indent(cg); emit_expr(cg,n); fprintf(cg->out,";\n"); break;
+        case NODE_FILE_CALL: cg_indent(cg); emit_expr(cg,n); fprintf(cg->out,";\n"); break;
         case NODE_BLOCK:  emit_block(cg,n); break;
         case NODE_PROGRAM: for (int i=0;i<n->child_count;i++) emit_stmt(cg,n->children[i]); break;
         default: break;

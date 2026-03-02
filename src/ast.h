@@ -42,6 +42,9 @@ typedef enum {
     NODE_FIELD_ACCESS,   
     NODE_FIELD_ASSIGN,   
     NODE_NULLABLE_DECL,  
+    /* gui.xxx / file.xxx API 呼び出し */
+    NODE_GUI_CALL,       /* str_val = "init"/"window"/... children=引数 */
+    NODE_FILE_CALL,      /* str_val = "open"/"close"/"read_byte"/... children=引数 */
 } NodeType;
 
 typedef struct Node Node;
