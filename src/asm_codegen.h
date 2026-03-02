@@ -587,10 +587,12 @@ static void acg_emit_expr(AsmCG *cg, Node *n) {
             OUT(cg,"    xorq %%rax, %%rax\n");
             break;
     }
-} ─────────────────────────────
- * gui.xxx → usagi_gui_xxx
- * file.xxx → usagi_file_xxx
- * int[] を渡す引数はポインタ(rax)をそのまま渡す (uSagi int[] = long*)
+}
+
+/* gui/file runtime call helper
+ * gui.xxx  -> usagi_gui_xxx
+ * file.xxx -> usagi_file_xxx
+ * uSagi int[] = long*, passed as pointer in rax
  */
 static void acg_emit_api_call(AsmCG *cg, Node *n, const char *prefix) {
     /* C呼び出し規約で引数をセット (最大6個整数引数) */
