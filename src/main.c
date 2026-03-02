@@ -79,7 +79,7 @@ static void merge_module_into(Node *prog, const char *modname) {
     if (pulled_count<MAX_PULLED) pulled_modules[pulled_count++]=strdup(modname);
     char *src=read_file(mod_path);
     if (!src) { fprintf(stderr,"モジュール読み込み失敗: %s\n",mod_path); free(mod_path); exit(1); }
-    fprintf(stderr,"\033[2m  $pull %s  →  %s\033[0m\n",modname,mod_path);
+    fprintf(stderr,"\033[2m  $pull %s  ->  %s\033[0m\n",modname,mod_path);
 
     const char *pf=g_errors.filename, *ps=g_errors.source;
     ec_init(mod_path,src);
@@ -102,101 +102,99 @@ static void merge_module_into(Node *prog, const char *modname) {
 
 static void print_banner(void) {
     fprintf(stderr,
-        "\033[1;35m🐰 uSagi v5\033[0m  "
-        "\033[2m(lex→parse→typecheck→asm | $pull | struct | dict<K,V> | nullable)\033[0m\n");
+        "\033[1;35mraise uSagi v5\033[0m  "
+        "\033[2m(lex->parse->typecheck->asm | $pull | struct | dict | nullable | gui | file)\033[0m\n");
+}
+
+/* runtime .c を候補ディレクトリから探す */
+static int find_runtime_src(const char *name, char *out, int outsz) {
+    char path[512];
+    snprintf(path,sizeof(path),"%s/src/%s",g_exe_dir,name);
+    if (file_exists(path)) { snprintf(out,outsz,"%s",path); return 1; }
+    snprintf(path,sizeof(path),"./src/%s",name);
+    if (file_exists(path)) { snprintf(out,outsz,"%s",path); return 1; }
+    snprintf(path,sizeof(path),"/usr/local/lib/usagi/%s",name);
+    if (file_exists(path)) { snprintf(out,outsz,"%s",path); return 1; }
+    return 0;
+}
+
+/* runtime .c をコンパイルして .o を生成、成功なら 1 */
+static int compile_runtime(const char *src_path, const char *obj_path, const char *extra_cflags) {
+    char cmd[4096]; char buf[2048]=""; size_t n; FILE *p;
+    snprintf(cmd,sizeof(cmd),"gcc -O2 %s -c '%s' -o '%s' 2>&1",
+             extra_cflags?extra_cflags:"", src_path, obj_path);
+    p=popen(cmd,"r"); if (!p) return 0;
+    n=fread(buf,1,sizeof(buf)-1,p); buf[n]=0;
+    int st=pclose(p);
+    if (st) { fprintf(stderr,"\033[1;33m[警告]\033[0m %s: %s\n",src_path,buf); return 0; }
+    return 1;
 }
 
 static int link_asm(const char *asm_file, const char *out) {
-    char obj[256]; snprintf(obj,sizeof(obj),"/tmp/usagi_%d.o",(int)getpid());
-    char cmd[4096]; char buf[4096]=""; size_t n; FILE *p;
-    char runtime_src[512], runtime_obj[512];
-    int has_runtime=0;
+    int pid=(int)getpid();
+    char obj[256]; snprintf(obj,sizeof(obj),"/tmp/usagi_%d.o",pid);
+    char cmd[8192]; char buf[4096]=""; size_t n; FILE *p;
 
-    
+    /* アセンブル */
     snprintf(cmd,sizeof(cmd),"as --64 '%s' -o '%s' 2>&1",asm_file,obj);
     p=popen(cmd,"r");
     if (p) { n=fread(buf,1,sizeof(buf)-1,p); buf[n]=0; int st=pclose(p);
         if (st) { fprintf(stderr,"\033[1;31m[asエラー]\033[0m\n%s\n",buf); return 1; } }
 
-    
+    /* usagi_runtime.c */
+    char rt_src[512]="", rt_obj[256]=""; int has_rt=0;
+    if (find_runtime_src("usagi_runtime.c",rt_src,sizeof(rt_src))) {
+        snprintf(rt_obj,sizeof(rt_obj),"/tmp/usagi_rt_%d.o",pid);
+        has_rt=compile_runtime(rt_src,rt_obj,NULL);
+        if (!has_rt) fprintf(stderr,"\033[1;33m[runtime警告]\033[0m dict機能が制限されます\n");
+    }
+
+    /* SDL2 フラグ取得 */
+    char sdl_cflags[512]="", sdl_lflags[512]="-lSDL2";
+    { FILE *f=popen("sdl2-config --cflags 2>/dev/null","r");
+      if(f){size_t k=fread(sdl_cflags,1,sizeof(sdl_cflags)-1,f);sdl_cflags[k]=0;
+        for(int i=(int)k-1;i>=0;i--){if(sdl_cflags[i]=='\n'||sdl_cflags[i]=='\r')sdl_cflags[i]=0;else break;}
+        pclose(f);}
+      f=popen("sdl2-config --libs 2>/dev/null","r");
+      if(f){size_t k=fread(sdl_lflags,1,sizeof(sdl_lflags)-1,f);sdl_lflags[k]=0;
+        for(int i=(int)k-1;i>=0;i--){if(sdl_lflags[i]=='\n'||sdl_lflags[i]=='\r')sdl_lflags[i]=0;else break;}
+        pclose(f);}
+    }
+
+    /* usagi_gui_runtime.c */
+    char gui_src[512]="", gui_obj[256]=""; int has_gui=0;
+    if (find_runtime_src("usagi_gui_runtime.c",gui_src,sizeof(gui_src))) {
+        snprintf(gui_obj,sizeof(gui_obj),"/tmp/usagi_gui_%d.o",pid);
+        has_gui=compile_runtime(gui_src,gui_obj,sdl_cflags);
+        if (!has_gui) fprintf(stderr,"\033[1;33m[gui警告]\033[0m GUI機能が無効（SDL2をインストール）\n");
+    }
+
+    /* usagi_file_runtime.c */
+    char file_src[512]="", file_obj[256]=""; int has_file=0;
+    if (find_runtime_src("usagi_file_runtime.c",file_src,sizeof(file_src))) {
+        snprintf(file_obj,sizeof(file_obj),"/tmp/usagi_file_%d.o",pid);
+        has_file=compile_runtime(file_src,file_obj,NULL);
+        if (!has_file) fprintf(stderr,"\033[1;33m[file警告]\033[0m File機能が制限されます\n");
+    }
+
+    /* リンク */
+    fprintf(stderr,"\033[2m  ld: gcc\033[0m\n");
     {
-        
-        const char *rt_candidates[]={
-            "./src/usagi_runtime.c",
-            "/usr/local/lib/usagi/usagi_runtime.c",
-            NULL
-        };
-        char rt_from_exe[512];
-        snprintf(rt_from_exe,sizeof(rt_from_exe),"%s/src/usagi_runtime.c",g_exe_dir);
-        snprintf(runtime_src,sizeof(runtime_src),"%s",rt_from_exe);
-        if (!file_exists(runtime_src)) {
-            for (int i=0;rt_candidates[i];i++) if(file_exists(rt_candidates[i])){snprintf(runtime_src,sizeof(runtime_src),"%s",rt_candidates[i]);break;}
-        }
-        snprintf(runtime_obj,sizeof(runtime_obj),"/tmp/usagi_rt_%d.o",(int)getpid());
-        has_runtime=file_exists(runtime_src);
-        if (has_runtime) {
-            snprintf(cmd,sizeof(cmd),"gcc -O2 -c '%s' -o '%s' 2>&1",runtime_src,runtime_obj);
-            p=popen(cmd,"r"); buf[0]=0;
-            if (p) { n=fread(buf,1,sizeof(buf)-1,p); buf[n]=0; int st=pclose(p);
-                if (st) { fprintf(stderr,"\033[1;33m[runtime警告]\033[0m dict機能が制限されます\n"); has_runtime=0; } }
-        }
-    }
-
-    
-    const char *ldso_cands[]={
-        "/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
-        "/lib64/ld-linux-x86-64.so.2",
-        "/lib/ld-linux-x86-64.so.2", NULL};
-    const char *libc_cands[]={
-        "/lib/x86_64-linux-gnu/libc.so.6",
-        "/lib64/libc.so.6",
-        "/usr/lib/x86_64-linux-gnu/libc.so.6", NULL};
-    const char *crtdirs[]={
-        "/usr/lib/x86_64-linux-gnu",
-        "/usr/lib/x86_64-linux-gnu/crt",
-        "/usr/lib64","/usr/lib", NULL};
-
-    const char *ldso=NULL,*libc=NULL;
-    for (int i=0;ldso_cands[i];i++) if(file_exists(ldso_cands[i])){ldso=ldso_cands[i];break;}
-    for (int i=0;libc_cands[i];i++) if(file_exists(libc_cands[i])){libc=libc_cands[i];break;}
-    char crt1[256]="",crti[256]="",crtn[256]="";
-    for (int i=0;crtdirs[i];i++) {
-        char t[256];
-        snprintf(t,sizeof(t),"%s/crt1.o",crtdirs[i]); if(file_exists(t)&&!crt1[0])memcpy(crt1,t,256);
-        snprintf(t,sizeof(t),"%s/crti.o",crtdirs[i]); if(file_exists(t)&&!crti[0])memcpy(crti,t,256);
-        snprintf(t,sizeof(t),"%s/crtn.o",crtdirs[i]); if(file_exists(t)&&!crtn[0])memcpy(crtn,t,256);
-        if(crt1[0]&&crti[0]&&crtn[0]) break;
-    }
-
-    if (!ldso||!libc||!crt1[0]) {
-        
-        fprintf(stderr,"\033[2m  ld: gcc fallback\033[0m\n");
-        if (has_runtime)
-            snprintf(cmd,sizeof(cmd),"gcc -o '%s' '%s' '%s' -lm 2>&1",out,obj,runtime_obj);
-        else
-            snprintf(cmd,sizeof(cmd),"gcc -o '%s' '%s' -lm 2>&1",out,obj);
+        char extra[2048]="";
+        if (has_rt)   { strcat(extra," '"); strcat(extra,rt_obj);   strcat(extra,"'"); }
+        if (has_gui)  { strcat(extra," '"); strcat(extra,gui_obj);  strcat(extra,"'"); }
+        if (has_file) { strcat(extra," '"); strcat(extra,file_obj); strcat(extra,"'"); }
+        snprintf(cmd,sizeof(cmd),"gcc -o '%s' '%s' %s -lm %s 2>&1",
+                 out, obj, extra, has_gui?sdl_lflags:"");
         p=popen(cmd,"r"); buf[0]=0;
-        if (p) { n=fread(buf,1,sizeof(buf)-1,p); buf[n]=0; int st=pclose(p);
-            if (st) { fprintf(stderr,"\033[1;31m[リンクエラー]\033[0m\n%s\n",buf); unlink(obj); return 1; } }
-        unlink(obj); return 0;
+        n=fread(buf,1,sizeof(buf)-1,p); buf[n]=0; int st=pclose(p);
+        if (st) { fprintf(stderr,"\033[1;31m[リンクエラー]\033[0m\n%s\n",buf); unlink(obj); return 1; }
     }
 
-    
-    if (has_runtime) {
-        snprintf(cmd,sizeof(cmd),
-            "ld -o '%s' -dynamic-linker '%s' '%s' '%s' '%s' '%s' '%s' '%s' -lc -lm 2>&1",
-            out,ldso,crt1,crti,obj,runtime_obj,libc,crtn);
-    } else {
-        snprintf(cmd,sizeof(cmd),
-            "ld -o '%s' -dynamic-linker '%s' '%s' '%s' '%s' '%s' '%s' -lc -lm 2>&1",
-            out,ldso,crt1,crti,obj,libc,crtn);
-    }
-    fprintf(stderr,"\033[2m  ld: %s\033[0m\n",ldso);
-    p=popen(cmd,"r"); buf[0]=0;
-    if (p) { n=fread(buf,1,sizeof(buf)-1,p); buf[n]=0; int st=pclose(p);
-        if (st) { fprintf(stderr,"\033[1;31m[リンクエラー]\033[0m\n%s\n",buf); unlink(obj); return 1; } }
     unlink(obj);
-    if (has_runtime) unlink(runtime_obj);
+    if (has_rt)   unlink(rt_obj);
+    if (has_gui)  unlink(gui_obj);
+    if (has_file) unlink(file_obj);
     return 0;
 }
 
@@ -226,7 +224,6 @@ int main(int argc, char **argv) {
     }
     if (!input_file) { fprintf(stderr,"入力ファイルが指定されていません\n"); return 1; }
 
-    
     {
         char tmp[1024]; strncpy(tmp,input_file,1023); tmp[1023]=0;
         char *sl=strrchr(tmp,'/');
@@ -238,7 +235,6 @@ int main(int argc, char **argv) {
         if (sl) { *sl=0; g_exe_dir=strdup(tmp); } else g_exe_dir=strdup(".");
     }
 
-    
     static char default_out[1024];
     if (!output_file) {
         const char *base=strrchr(input_file,'/'); base=base?base+1:input_file;
@@ -252,60 +248,76 @@ int main(int argc, char **argv) {
     if (!src) { fprintf(stderr,"\033[1;31m[エラー]\033[0m 開けません: '%s'\n",input_file); return 1; }
 
     print_banner();
-
-    
     ec_init(input_file,src);
     TokenList tl=tokenize(src);
-
-    
     Node *prog=parse_program(tl);
     token_list_free(&tl);
-
-    
     process_pulls(prog);
-
-    
     ec_init(input_file,src);
     if (!no_typecheck) typecheck(prog);
 
-    
     if (emit_c || backend_c) {
-        
         const char *c_file="/tmp/usagi_out.c";
         FILE *cf=fopen(c_file,"w");
         if (!cf) { fprintf(stderr,"tmpファイル作成失敗\n"); return 1; }
         codegen(prog,cf); fclose(cf);
-
         if (emit_c) {
             char *cs=read_file(c_file); if(cs){printf("%s",cs);free(cs);}
             node_free(prog); free(src); return 0;
         }
-        char cmd[2048]; char gcc_out[4096]=""; size_t gl;
-        snprintf(cmd,sizeof(cmd),"gcc -O2 -o '%s' '%s' 2>&1",output_file,c_file);
+        /* --backend-c: runtime をコンパイルして gcc でリンク */
+        int pid=(int)getpid();
+        char sdl_cf[512]="", sdl_lf[512]="-lSDL2";
+        { FILE *f=popen("sdl2-config --cflags 2>/dev/null","r");
+          if(f){size_t k=fread(sdl_cf,1,sizeof(sdl_cf)-1,f);sdl_cf[k]=0;
+            for(int i=(int)k-1;i>=0;i--){if(sdl_cf[i]=='\n'||sdl_cf[i]=='\r')sdl_cf[i]=0;else break;}
+            pclose(f);}
+          f=popen("sdl2-config --libs 2>/dev/null","r");
+          if(f){size_t k=fread(sdl_lf,1,sizeof(sdl_lf)-1,f);sdl_lf[k]=0;
+            for(int i=(int)k-1;i>=0;i--){if(sdl_lf[i]=='\n'||sdl_lf[i]=='\r')sdl_lf[i]=0;else break;}
+            pclose(f);}
+        }
+        char bc_rt_src[512]="",bc_rt_obj[256]=""; int bc_has_rt=0;
+        if(find_runtime_src("usagi_runtime.c",bc_rt_src,sizeof(bc_rt_src))){
+            snprintf(bc_rt_obj,sizeof(bc_rt_obj),"/tmp/usagi_bcrt_%d.o",pid);
+            bc_has_rt=compile_runtime(bc_rt_src,bc_rt_obj,NULL);}
+        char bc_gui_src[512]="",bc_gui_obj[256]=""; int bc_has_gui=0;
+        if(find_runtime_src("usagi_gui_runtime.c",bc_gui_src,sizeof(bc_gui_src))){
+            snprintf(bc_gui_obj,sizeof(bc_gui_obj),"/tmp/usagi_bcgui_%d.o",pid);
+            bc_has_gui=compile_runtime(bc_gui_src,bc_gui_obj,sdl_cf);}
+        char bc_file_src[512]="",bc_file_obj[256]=""; int bc_has_file=0;
+        if(find_runtime_src("usagi_file_runtime.c",bc_file_src,sizeof(bc_file_src))){
+            snprintf(bc_file_obj,sizeof(bc_file_obj),"/tmp/usagi_bcfile_%d.o",pid);
+            bc_has_file=compile_runtime(bc_file_src,bc_file_obj,NULL);}
+        char bc_extra[2048]="";
+        if(bc_has_rt)  {strcat(bc_extra," '");strcat(bc_extra,bc_rt_obj);  strcat(bc_extra,"'");}
+        if(bc_has_gui) {strcat(bc_extra," '");strcat(bc_extra,bc_gui_obj); strcat(bc_extra,"'");}
+        if(bc_has_file){strcat(bc_extra," '");strcat(bc_extra,bc_file_obj);strcat(bc_extra,"'");}
+        char cmd[8192]; char gcc_out[4096]=""; size_t gl;
+        snprintf(cmd,sizeof(cmd),"gcc -O2 -o '%s' '%s' %s -lm %s 2>&1",
+                 output_file,c_file,bc_extra,bc_has_gui?sdl_lf:"");
         FILE *g=popen(cmd,"r");
         if (g) { gl=fread(gcc_out,1,sizeof(gcc_out)-1,g); gcc_out[gl]=0; int st=pclose(g);
+            if(bc_has_rt)  unlink(bc_rt_obj);
+            if(bc_has_gui) unlink(bc_gui_obj);
+            if(bc_has_file)unlink(bc_file_obj);
             if (st) { fprintf(stderr,"\033[1;31m[gccエラー]\033[0m\n%s\n",gcc_out); node_free(prog); free(src); return 1; } }
-
     } else {
-        
         char asm_file[256];
         snprintf(asm_file,sizeof(asm_file),"/tmp/usagi_%d.s",(int)getpid());
-
         FILE *af=fopen(asm_file,"w");
         if (!af) { fprintf(stderr,"tmpファイル作成失敗\n"); return 1; }
         asm_codegen(prog,af); fclose(af);
-
         if (emit_asm) {
             char *as=read_file(asm_file); if(as){printf("%s",as);free(as);}
             unlink(asm_file); node_free(prog); free(src); return 0;
         }
-
         int r=link_asm(asm_file,output_file);
         unlink(asm_file);
         if (r) { node_free(prog); free(src); return 1; }
     }
 
-    fprintf(stderr,"\033[1;32m✓\033[0m → \033[1m%s\033[0m\n",output_file);
+    fprintf(stderr,"\033[1;32m\u2713\033[0m -> \033[1m%s\033[0m\n",output_file);
     node_free(prog); free(src);
     return 0;
 }
