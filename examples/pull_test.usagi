@@ -1,0 +1,29 @@
+\\ $pull モジュールテスト 🐰
+
+$pull math
+$pull string
+
+main(void) {
+    \\ math モジュール
+    terminal.print("abs(-42) =", abs(-42) "");
+    terminal.print("max(10, 99) =", max(10, 99) "");
+    terminal.print("min(10, 99) =", min(10, 99) "");
+    terminal.print("pow(2, 10) =", pow(2, 10) "");
+    terminal.print("clamp(150, 0, 100) =", clamp(150, 0, 100) "");
+
+    \\ bool
+    if is_even(42) then {
+        terminal.print("42 は偶数");
+    end
+    if is_odd(7) then {
+        terminal.print("7 は奇数");
+    end
+
+    \\ string モジュール
+    line := str_repeat("=-", 10)
+    terminal.print(line);
+    terminal.print("str_empty(\"\") =", str_empty("") "");
+    terminal.print("to_str(2025) =", to_str(2025));
+end
+
+allend

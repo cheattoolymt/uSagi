@@ -1,0 +1,60 @@
+\\ usagi-lang サンプルプログラム 🐰
+
+\\*
+  変数宣言
+*\\
+a = str
+b = int
+c = float
+d = bool
+
+\\ 戻り値型付き関数（追加）
+add(x = int, y = int) -> int {
+    return x + y
+end
+
+greet(name = str) {
+    terminal.print("Hello,", name .. "!");
+end
+
+main(void) {
+    terminal.input("What's your name?", a);
+    greet(a);
+
+    b = 42
+    terminal.print("Answer:", b "");
+
+    \\ bool型（追加）
+    d = true
+    if d == true then {
+        terminal.print("bool works!");
+    end
+
+    \\ 戻り値型付き関数呼び出し
+    b = add(10, 32);
+    terminal.print("10 + 32 =", b "");
+
+    \\ break / continue（追加）
+    for i = 1 to 10 {
+        if i == 6 then { break end
+        if i == 3 then { continue end
+        terminal.print("Count:", i "");
+    end
+
+    \\ 文字列==比較（strcmpを使用・修正済み）
+    if a == "World" then {
+        terminal.print("Hello, World!");
+    else
+        terminal.print("Hey,", a .. "!");
+    end
+
+    \\ loopとbreak
+    b = 0
+    loop {
+        b = b + 1
+        if b == 3 then { break end
+    end
+    terminal.print("loop ended at b =", b "");
+end
+
+allend

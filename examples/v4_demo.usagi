@@ -1,0 +1,68 @@
+\\ usagi-lang v4 新機能デモ 🐰
+
+\\ ── 型推論 (:=) ────────────────────────
+name := "usagi"
+version := 4
+score := 98.6
+active := true
+
+\\ ── f-string ────────────────────────────
+greeting := f"Language: {name} v{version}"
+terminal.print(greeting);
+
+\\ ── dict型 ───────────────────────────────
+stats = dict
+stats = {"lang": "usagi", "score": "high", "status": "active"}
+terminal.print("lang:", stats["lang"]);
+terminal.print("score:", stats["score"]);
+
+\\ ── match文 ─────────────────────────────
+day := 3
+match day {
+    case 1 => {
+        terminal.print("Monday");
+    end
+    case 2 => {
+        terminal.print("Tuesday");
+    end
+    case 3 => {
+        terminal.print("Wednesday");
+    end
+    case _ => {
+        terminal.print("Other day");
+    end
+}
+
+\\ ── 深いelseif（以前はバグ）───────────────
+points := 75
+if points >= 90 then {
+    terminal.print("Rank: S");
+elseif points >= 80 then {
+    terminal.print("Rank: A");
+elseif points >= 70 then {
+    terminal.print("Rank: B");
+elseif points >= 60 then {
+    terminal.print("Rank: C");
+else
+    terminal.print("Rank: D");
+end
+
+\\ ── % 演算子（モジュロ）─────────────────
+fizzbuzz(n = int) -> str {
+    if n % 15 == 0 then {
+        return "FizzBuzz"
+    elseif n % 3 == 0 then {
+        return "Fizz"
+    elseif n % 5 == 0 then {
+        return "Buzz"
+    else
+        return usagi_tostr(n)
+    end
+end
+
+terminal.print("FizzBuzz 1-15:");
+for i = 1 to 15 {
+    terminal.print(fizzbuzz(i));
+end
+
+allend

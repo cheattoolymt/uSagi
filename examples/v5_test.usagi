@@ -1,0 +1,57 @@
+\\ usagi-lang v5 新機能テスト 🐰
+
+\\ ── struct定義 ─────────────────────────────────
+struct Point {
+    x = int
+    y = int
+end
+
+struct Person {
+    name = str
+    age  = int
+    score = float
+end
+
+\\ ── nullable ─────────────────────────────────
+maybe = str?
+maybe = nil
+
+main(void) {
+    \\ struct インスタンス生成
+    p = Point
+    p = new Point{ x: 10, y: 20 }
+    terminal.print("Point.x =", p.x "");
+    terminal.print("Point.y =", p.y "");
+
+    \\ フィールド変更
+    p.x = 99
+    terminal.print("変更後 x =", p.x "");
+
+    \\ struct を関数に渡す
+    alice = Person
+    alice = new Person{ name: "Alice", age: 25, score: 98.5 }
+    terminal.print("Name:", alice.name);
+    terminal.print("Age:", alice.age "");
+    terminal.print("Score:", alice.score "");
+
+    \\ dict<str, str> ジェネリック
+    env = dict<str, str>
+    env = {"lang": "usagi", "version": "5", "status": "active"}
+    terminal.print("lang:", env["lang"]);
+    terminal.print("version:", env["version"]);
+
+    \\ nullable
+    note = str?
+    note = "hello"
+    terminal.print("note:", note);
+    note = nil
+    if note == nil then {
+        terminal.print("note is nil");
+    end
+
+    \\ 型推論 :=
+    greeting := f"Hello from usagi v5!"
+    terminal.print(greeting);
+end
+
+allend

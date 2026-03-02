@@ -1,0 +1,35 @@
+\\ テスト: 新機能＆バグ修正確認
+
+\\ 配列リテラル代入 + len() + arr[i] = val
+nums = int[]
+nums = [10, 20, 30, 40, 50]
+nums[2] = 99
+
+main(void) {
+    \\ bool修正テスト (以前はfalseになっていた)
+    flag = bool
+    flag = true
+    if flag then {
+        terminal.print("bool fix: true OK");
+    end
+
+    \\ bool printテスト
+    terminal.print("flag =", flag "");
+
+    \\ 配列リテラル + len() テスト
+    terminal.print("len(nums) =", len(nums) "");
+    terminal.print("nums[2] =", nums[2] "");
+
+    \\ elseif テスト
+    x = int
+    x = 5
+    if x == 1 then {
+        terminal.print("one");
+    elseif x == 5 then {
+        terminal.print("elseif: five!");
+    else
+        terminal.print("other");
+    end
+end
+
+allend

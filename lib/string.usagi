@@ -1,0 +1,30 @@
+\\ usagi標準ライブラリ: string 🐰
+\\ $pull string で読み込む
+
+\\ 繰り返し: "ab" を 3回 → "ababab"
+str_repeat(s = str, n = int) -> str {
+    result = str
+    result = ""
+    i = int
+    for i = 1 to n {
+        result = result .. s
+    end
+    return result
+end
+
+\\ 文字列が空かどうか
+str_empty(s = str) -> bool {
+    return s == ""
+end
+
+\\ 整数を文字列に変換 (usagi_tostr のラッパー)
+to_str(n = int) -> str {
+    return usagi_tostr(n)
+end
+
+\\ 浮動小数点を文字列に変換
+to_str_f(n = float) -> str {
+    return usagi_tostr_f(n)
+end
+
+allend

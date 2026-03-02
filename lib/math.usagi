@@ -1,0 +1,56 @@
+\\ usagi標準ライブラリ: math 🐰
+\\ $pull math で読み込む
+
+\\ 絶対値 (int)
+abs(n = int) -> int {
+    if n < 0 then {
+        return -n
+    end
+    return n
+end
+
+\\ 最大値
+max(a = int, b = int) -> int {
+    if a > b then {
+        return a
+    end
+    return b
+end
+
+\\ 最小値
+min(a = int, b = int) -> int {
+    if a < b then {
+        return a
+    end
+    return b
+end
+
+\\ べき乗 (整数)
+pow(base = int, exp = int) -> int {
+    result = int
+    result = 1
+    i = int
+    for i = 1 to exp {
+        result = result * base
+    end
+    return result
+end
+
+\\ クランプ: val を [lo, hi] に収める
+clamp(val = int, lo = int, hi = int) -> int {
+    if val < lo then { return lo end
+    if val > hi then { return hi end
+    return val
+end
+
+\\ 偶数判定
+is_even(n = int) -> bool {
+    return n % 2 == 0
+end
+
+\\ 奇数判定
+is_odd(n = int) -> bool {
+    return n % 2 != 0
+end
+
+allend
