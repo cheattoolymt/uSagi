@@ -129,6 +129,10 @@ static const char *node_usagi_type(Node *n, SymTable *locals, SymTable *globals)
             const char *r=node_usagi_type(n->children[1],locals,globals);
             if (!strcmp(n->str_val,"==")||!strcmp(n->str_val,"!=")||!strcmp(n->str_val,"<")||
                 !strcmp(n->str_val,">")||!strcmp(n->str_val,"<=")||!strcmp(n->str_val,">=")) return "bool";
+            /* bitwise ops return int */
+            if (!strcmp(n->str_val,"&")||!strcmp(n->str_val,"|")||
+                !strcmp(n->str_val,"^")||!strcmp(n->str_val,"<<")||
+                !strcmp(n->str_val,">>")) return "int";
             if ((l&&!strcmp(l,"float"))||(r&&!strcmp(r,"float"))) return "float";
             return l?l:r;
         }
@@ -276,6 +280,7 @@ static void emit_expr(Codegen *cg, Node *n) {
         }
         case NODE_UNOP:
             if (!strcmp(n->str_val,"not")) { fprintf(cg->out,"!("); emit_expr(cg,n->children[0]); fprintf(cg->out,")"); }
+            else if (!strcmp(n->str_val,"~")) { fprintf(cg->out,"~("); emit_expr(cg,n->children[0]); fprintf(cg->out,")"); }
             else { fprintf(cg->out,"-("); emit_expr(cg,n->children[0]); fprintf(cg->out,")"); }
             break;
         case NODE_CONCAT:

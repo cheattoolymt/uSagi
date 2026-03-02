@@ -142,6 +142,10 @@ static const char *acg_node_type(AsmCG *cg, Node *n) {
             if (!strcmp(n->str_val,"==")||!strcmp(n->str_val,"!=")||
                 !strcmp(n->str_val,"<") ||!strcmp(n->str_val,">")||
                 !strcmp(n->str_val,"<=")||!strcmp(n->str_val,">=")) return "bool";
+            /* bitwise ops return int */
+            if (!strcmp(n->str_val,"&")||!strcmp(n->str_val,"|")||
+                !strcmp(n->str_val,"^")||!strcmp(n->str_val,"<<")||
+                !strcmp(n->str_val,">>")) return "int";
             if ((l&&!strcmp(l,"float"))||(r&&!strcmp(r,"float"))) return "float";
             return l?l:r;
         }
@@ -413,6 +417,12 @@ static void acg_emit_expr(AsmCG *cg, Node *n) {
             else if (!strcmp(n->str_val,"%"))  { OUT(cg,"    cqto\n"); OUT(cg,"    idivq %%rcx\n"); OUT(cg,"    movq %%rdx, %%rax\n"); }
             else if (!strcmp(n->str_val,"&&")) OUT(cg,"    andq %%rcx, %%rax\n");
             else if (!strcmp(n->str_val,"||")) OUT(cg,"    orq %%rcx, %%rax\n");
+            /* bitwise operators */
+            else if (!strcmp(n->str_val,"&"))  OUT(cg,"    andq %%rcx, %%rax\n");
+            else if (!strcmp(n->str_val,"|"))  OUT(cg,"    orq %%rcx, %%rax\n");
+            else if (!strcmp(n->str_val,"^"))  OUT(cg,"    xorq %%rcx, %%rax\n");
+            else if (!strcmp(n->str_val,"<<")) OUT(cg,"    shlq %%cl, %%rax\n");
+            else if (!strcmp(n->str_val,">>")) OUT(cg,"    sarq %%cl, %%rax\n");
             else if (!strcmp(n->str_val,"==")||!strcmp(n->str_val,"!=")||
                      !strcmp(n->str_val,"<") ||!strcmp(n->str_val,">")||
                      !strcmp(n->str_val,"<=")||!strcmp(n->str_val,">=")) {
@@ -435,6 +445,8 @@ static void acg_emit_expr(AsmCG *cg, Node *n) {
                 OUT(cg,"    testq %%rax, %%rax\n");
                 OUT(cg,"    sete %%al\n");
                 OUT(cg,"    movzbq %%al, %%rax\n");
+            } else if (!strcmp(n->str_val,"~")) {
+                OUT(cg,"    notq %%rax\n");
             } else {
                 OUT(cg,"    negq %%rax\n");
             }

@@ -50,6 +50,9 @@ typedef enum {
     TOK_CONCAT,
     TOK_ARROW,
     TOK_AND, TOK_OR, TOK_NOT,
+    /* bitwise operators */
+    TOK_BAND, TOK_BOR, TOK_BXOR, TOK_BNOT,
+    TOK_LSHIFT, TOK_RSHIFT,
     TOK_LPAREN, TOK_RPAREN,
     TOK_LBRACE, TOK_RBRACE,
     TOK_LBRACKET, TOK_RBRACKET,
@@ -130,7 +133,28 @@ static Token lex_string(Lexer *l, int is_fstr) {
     free(buf); return tok;
 }
 static Token lex_number(Lexer *l) {
-    int start=l->pos,sc=l->col,is_float=0;
+    int sc=l->col;
+    /* 0x hex literal */
+    if (l->src[l->pos]=='0'&&(l->src[l->pos+1]=='x'||l->src[l->pos+1]=='X')) {
+        l->pos+=2; l->col+=2;
+        int start=l->pos;
+        while (isxdigit(l->src[l->pos])) { l->pos++; l->col++; }
+        int len=l->pos-start; char *hex=malloc(len+1); memcpy(hex,l->src+start,len); hex[len]=0;
+        long val=(long)strtol(hex,NULL,16); free(hex);
+        char buf[32]; snprintf(buf,sizeof(buf),"%ld",val);
+        return make_token(TOK_INT_LIT,buf,l->line,sc);
+    }
+    /* 0b binary literal */
+    if (l->src[l->pos]=='0'&&(l->src[l->pos+1]=='b'||l->src[l->pos+1]=='B')) {
+        l->pos+=2; l->col+=2;
+        int start=l->pos;
+        while (l->src[l->pos]=='0'||l->src[l->pos]=='1') { l->pos++; l->col++; }
+        int len=l->pos-start; char *bin=malloc(len+1); memcpy(bin,l->src+start,len); bin[len]=0;
+        long val=(long)strtol(bin,NULL,2); free(bin);
+        char buf[32]; snprintf(buf,sizeof(buf),"%ld",val);
+        return make_token(TOK_INT_LIT,buf,l->line,sc);
+    }
+    int start=l->pos,is_float=0;
     while (isdigit(l->src[l->pos])) { l->pos++; l->col++; }
     if (l->src[l->pos]=='.'&&isdigit(l->src[l->pos+1])) { is_float=1; l->pos++; l->col++; while(isdigit(l->src[l->pos])) { l->pos++; l->col++; } }
     int len=l->pos-start; char *buf=malloc(len+1); memcpy(buf,l->src+start,len); buf[len]=0;
@@ -202,6 +226,8 @@ static TokenList tokenize(const char *src) {
         if (c=='!'&&l.src[l.pos+1]=='=') { l.pos+=2;l.col+=2; tl_push(&tl,make_token(TOK_NEQ,"!=",ln,co)); continue; }
         if (c=='<'&&l.src[l.pos+1]=='=') { l.pos+=2;l.col+=2; tl_push(&tl,make_token(TOK_LE,"<=",ln,co)); continue; }
         if (c=='>'&&l.src[l.pos+1]=='=') { l.pos+=2;l.col+=2; tl_push(&tl,make_token(TOK_GE,">=",ln,co)); continue; }
+        if (c=='<'&&l.src[l.pos+1]=='<') { l.pos+=2;l.col+=2; tl_push(&tl,make_token(TOK_LSHIFT,"<<",ln,co)); continue; }
+        if (c=='>'&&l.src[l.pos+1]=='>') { l.pos+=2;l.col+=2; tl_push(&tl,make_token(TOK_RSHIFT,">>",ln,co)); continue; }
         if (c=='-'&&l.src[l.pos+1]=='>') { l.pos+=2;l.col+=2; tl_push(&tl,make_token(TOK_ARROW,"->",ln,co)); continue; }
         if (c=='='&&l.src[l.pos+1]=='>') { l.pos+=2;l.col+=2; tl_push(&tl,make_token(TOK_FATARROW,"=>",ln,co)); continue; }
         if (c==':'&&l.src[l.pos+1]=='=') { l.pos+=2;l.col+=2; tl_push(&tl,make_token(TOK_COLONASSIGN,":=",ln,co)); continue; }
@@ -228,6 +254,10 @@ static TokenList tokenize(const char *src) {
             case ':': tl_push(&tl,make_token(TOK_COLON,":",ln,co));     break;
             case '?': tl_push(&tl,make_token(TOK_QUESTION,"?",ln,co));  break;
             case '.': tl_push(&tl,make_token(TOK_DOT,".",ln,co));       break;
+            case '&': tl_push(&tl,make_token(TOK_BAND,"&",ln,co));      break;
+            case '|': tl_push(&tl,make_token(TOK_BOR,"|",ln,co));       break;
+            case '^': tl_push(&tl,make_token(TOK_BXOR,"^",ln,co));      break;
+            case '~': tl_push(&tl,make_token(TOK_BNOT,"~",ln,co));      break;
             default: { char unk[2]={c,0}; tl_push(&tl,make_token(TOK_UNKNOWN,unk,ln,co)); break; }
         }
     }

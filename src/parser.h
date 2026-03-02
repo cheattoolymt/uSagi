@@ -154,6 +154,10 @@ static Node *parse_primary(Parser *p) {
         p_advance(p); Node *n=node_new(NODE_UNOP,t.line,t.col); n->str_val=strdup("not");
         node_add_child(n,parse_primary(p)); return n;
     }
+    if (t.type==TOK_BNOT) {
+        p_advance(p); Node *n=node_new(NODE_UNOP,t.line,t.col); n->str_val=strdup("~");
+        node_add_child(n,parse_primary(p)); return n;
+    }
     if (t.type==TOK_MINUS) {
         p_advance(p); Node *inner=parse_primary(p);
         if (inner->type==NODE_INT_LIT)   { inner->int_val=-inner->int_val; return inner; }
@@ -211,10 +215,14 @@ static Node *parse_primary(Parser *p) {
 static int binop_prec(TokenType t) {
     switch(t) {
         case TOK_OR: return 1; case TOK_AND: return 2;
-        case TOK_EQ: case TOK_NEQ: case TOK_LT: case TOK_GT: case TOK_LE: case TOK_GE: return 3;
-        case TOK_CONCAT: return 4;
-        case TOK_PLUS: case TOK_MINUS: return 5;
-        case TOK_STAR: case TOK_SLASH: case TOK_PERCENT: return 6;
+        case TOK_BOR:  return 3;
+        case TOK_BXOR: return 4;
+        case TOK_BAND: return 5;
+        case TOK_EQ: case TOK_NEQ: case TOK_LT: case TOK_GT: case TOK_LE: case TOK_GE: return 6;
+        case TOK_LSHIFT: case TOK_RSHIFT: return 7;
+        case TOK_CONCAT: return 8;
+        case TOK_PLUS: case TOK_MINUS: return 9;
+        case TOK_STAR: case TOK_SLASH: case TOK_PERCENT: return 10;
         default: return 0;
     }
 }
@@ -227,6 +235,8 @@ static const char *tok_op_str(TokenType t) {
         case TOK_STAR: return "*"; case TOK_SLASH: return "/";
         case TOK_PERCENT: return "%";
         case TOK_AND: return "&&"; case TOK_OR: return "||";
+        case TOK_BAND: return "&"; case TOK_BOR: return "|"; case TOK_BXOR: return "^";
+        case TOK_LSHIFT: return "<<"; case TOK_RSHIFT: return ">>";
         case TOK_CONCAT: return ".."; default: return "?";
     }
 }
